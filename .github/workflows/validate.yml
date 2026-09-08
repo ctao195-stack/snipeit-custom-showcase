@@ -1,0 +1,36 @@
+name: Validate public archive
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install automation dependencies
+        run: python -m pip install -r automation/公共配置/requirements-snipeit-excel.txt
+      - name: Check public safety boundary
+        run: bash scripts/verify-public.sh
+      - name: Lint PHP files
+        run: find overlay experiments -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Compile Python files
+        run: python -m compileall -q automation
+      - name: Check activity workbook schema
+        run: python automation/活动记录同步/verify_snipeit_excel_schema.py
+      - name: Check patch against Snipe-IT v8.1.18
+        run: |
+          git clone --depth 1 --branch v8.1.18 https://github.com/grokability/snipe-it.git /tmp/snipe-it-v8.1.18
+          git -C /tmp/snipe-it-v8.1.18 apply --check "$GITHUB_WORKSPACE/patches/snipe-it-v8.1.18-custom.patch"
